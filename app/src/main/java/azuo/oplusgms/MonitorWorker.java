@@ -19,6 +19,8 @@ import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
+import java.util.concurrent.TimeUnit;
+
 public class MonitorWorker extends Worker {
     public static final String GMS_RESTRICTED = "google_restric_info";
 
@@ -61,7 +63,6 @@ public class MonitorWorker extends Worker {
                         -1,
                         new NotificationCompat.Builder(context, channel.getId())
                             .setSmallIcon(R.mipmap.ic_launcher)
-                            .setContentText(GMS_RESTRICTED)
                             .setGroup(group)
                             .setGroupSummary(true)
                             .build()
@@ -77,23 +78,27 @@ public class MonitorWorker extends Worker {
     }
 
     public static void enqueue(Context context) {
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            "OnePlusGMS",
-            ExistingWorkPolicy.KEEP,
-            new OneTimeWorkRequest.Builder(MonitorWorker.class).build()
-        );
+        WorkManager.getInstance(context).enqueue(OneTimeWorkRequest.from(MonitorWorker.class));
     }
 
     public static void enqueueTrigger(Context context) {
-        WorkManager.getInstance(context).enqueueUniqueWork(
+        WorkManager workManager = WorkManager.getInstance(context);
+        workManager.enqueueUniqueWork(
             "OnePlusGMSTrigger",
             ExistingWorkPolicy.KEEP,
             new OneTimeWorkRequest.Builder(Trigger.class).setConstraints(
                 new Constraints.Builder().addContentUriTrigger(
-                    Settings.Secure.CONTENT_URI.buildUpon().appendPath(GMS_RESTRICTED).build(),
-                   false
+                    Settings.Secure.getUriFor(GMS_RESTRICTED),
+                    false
                 ).build()
             ).build()
+        );
+        workManager.enqueueUniqueWork(
+            "OnePlusGMSTimer",
+            ExistingWorkPolicy.REPLACE,
+            new OneTimeWorkRequest.Builder(Trigger.class)
+                .setInitialDelay(1, TimeUnit.HOURS)
+                .build()
         );
     }
 
